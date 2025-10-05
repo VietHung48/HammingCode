@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Mã Hóa & Giải Mã Hamming (11,7)</title>
+<style>
+    body {
+        font-family: "Segoe UI", sans-serif;
+        background: #eef6ff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
+    h1 { color: #2a5fa5; margin-bottom: 10px; }
+    input[type="text"] {
+        font-size: 18px;
+        padding: 6px;
+        width: 240px;
+        text-align: center;
+        border: 2px solid #2a5fa5;
+        border-radius: 8px;
+        outline: none;
+    }
+    button {
+        margin-top: 10px;
+        padding: 8px 14px;
+        background-color: #2a5fa5;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    button:hover { background-color: #1e477b; }
+
+    .result {
+        margin-top: 20px;
+        font-size: 20px;
+        font-weight: bold;
+    }
+    .bit {
+        display: inline-block;
+        padding: 4px 6px;
+        margin: 1px;
+        border-radius: 4px;
+    }
+    .parity { background-color: yellow; }
+    .error { background-color: #ff7070; color: white; }
+    .fixed { background-color: #5cb85c; color: white; }
+
+    .section { margin-bottom: 30px; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Mã Hóa & Giải Mã Hamming (11,7)</h1>
+
+<div class="section">
+    <p>Nhập chuỗi 7 bit dữ liệu (ví dụ: <code>1001101</code>):</p>
+    <input type="text" id="dataInput" maxlength="7" placeholder="VD: 1001101" onkeypress="return onlyBits(event)">
+    <br>
+    <button onclick="encodeHamming()">🔒 Mã hóa</button>
+    <div class="result" id="encodeResult"></div>
+</div>
+
+<hr style="width:80%;">
+
+<div class="section">
+    <p>Nhập chuỗi mã 11 bit để giải mã (hoặc để thử tạo lỗi 1 bit):</p>
+    <input type="text" id="codeInput" maxlength="11" placeholder="VD: 10011100101" onkeypress="return onlyBits(event)">
+    <br>
+    <button onclick="decodeHamming()">🔓 Giải mã</button>
+    <button onclick="randomError()">💥 Tạo lỗi ngẫu nhiên</button>
+    <div class="result" id="decodeResult"></div>
+</div>
+
+<script>
+function onlyBits(e) {
+    let key = e.key;
+    if (key !== "0" && key !== "1" && key !== "Backspace" && key !== "Delete" && key !== "ArrowLeft" && key !== "ArrowRight") {
+        e.preventDefault();
+        return false;
+    }
+    return true;
+}
+
+function encodeHamming() {
+    let data = document.getElementById("dataInput").value.trim();
+    if (!/^[01]{7}$/.test(data)) {
+        alert("Chuỗi dữ liệu phải gồm đúng 7 ký tự và chỉ chứa 0 hoặc 1!");
+        return;
+    }
+
+    let dataBits = data.split("").reverse();
+    let hamming = [];
+    let parityPositions = [1, 2, 4, 8];
+    let j = 0;
+
+    for (let i = 1; i <= 11; i++) {
+        if (parityPositions.includes(i)) hamming[i] = 0;
+        else hamming[i] = parseInt(dataBits[j++]);
+    }
+
+    for (let p of parityPositions) {
+        let parity = 0;
+        for (let k = 1; k <= 11; k++) {
+            if (k & p && k !== p) parity ^= hamming[k];
+        }
+        hamming[p] = parity;
+    }
+
+    let resultDiv = document.getElementById("encodeResult");
+    resultDiv.innerHTML = "<strong>Chuỗi mã hóa (11,7):</strong> ";
+    for (let i = 11; i >= 1; i--) {
+        let span = document.createElement("span");
+        span.textContent = hamming[i];
+        span.classList.add("bit");
+        if (parityPositions.includes(i)) span.classList.add("parity");
+        resultDiv.appendChild(span);
+    }
+
+    document.getElementById("codeInput").value = hamming.reverse().join("");
+}
+
+function decodeHamming() {
+    let code = document.getElementById("codeInput").value.trim();
+    if (!/^[01]{11}$/.test(code)) {
+        alert("Chuỗi mã phải gồm đúng 11 ký tự và chỉ chứa 0 hoặc 1!");
+        return;
+    }
+
+    let bits = code.split("").reverse().map(Number);
+    let parityPositions = [1, 2, 4, 8];
+    let syndrome = 0;
+
+    for (let p of parityPositions) {
+        let parity = 0;
+        for (let k = 1; k <= 11; k++) {
+            if (k & p) parity ^= bits[k - 1];
+        }
+        if (parity !== 0) syndrome += p;
+    }
+
+    let resultDiv = document.getElementById("decodeResult");
+    resultDiv.innerHTML = "<strong>Kết quả giải mã:</strong><br>";
+
+    let beforeDiv = document.createElement("div");
+    beforeDiv.innerHTML = "<em>Trước khi sửa:</em> ";
+    for (let i = 11; i >= 1; i--) {
+        let span = document.createElement("span");
+        span.textContent = bits[i - 1];
+        span.classList.add("bit");
+        if (parityPositions.includes(i)) span.classList.add("parity");
+        if (i === syndrome && syndrome !== 0) span.classList.add("error");
+        beforeDiv.appendChild(span);
+    }
+    resultDiv.appendChild(beforeDiv);
+
+    if (syndrome !== 0 && syndrome <= 11) {
+        bits[syndrome - 1] ^= 1;
+        let afterDiv = document.createElement("div");
+        afterDiv.innerHTML = "<em>Sau khi sửa:</em> ";
+        for (let i = 11; i >= 1; i--) {
+            let span = document.createElement("span");
+            span.textContent = bits[i - 1];
+            span.classList.add("bit");
+            if (parityPositions.includes(i)) span.classList.add("parity");
+            if (i === syndrome) span.classList.add("fixed");
+            afterDiv.appendChild(span);
+        }
+        resultDiv.appendChild(afterDiv);
+        resultDiv.innerHTML += `<p>🧩 Phát hiện lỗi tại vị trí bit thứ <b>${syndrome}</b> (đã được sửa).</p>`;
+    } else if (syndrome === 0) {
+        resultDiv.innerHTML += "<p>✅ Không phát hiện lỗi nào trong chuỗi mã!</p>";
+    } else {
+        resultDiv.innerHTML += "<p>⚠️ Phát hiện lỗi ngoài phạm vi (đa bit) — không thể sửa!</p>";
+    }
+
+    let dataBits = [];
+    for (let i = 1; i <= 11; i++) {
+        if (!parityPositions.includes(i)) dataBits.push(bits[i - 1]);
+    }
+    let decoded = dataBits.reverse().join("");
+    resultDiv.innerHTML += `<p><strong>Dữ liệu sau giải mã:</strong> ${decoded}</p>`;
+}
+
+function randomError() {
+    let codeField = document.getElementById("codeInput");
+    let code = codeField.value.trim();
+    if (!/^[01]{11}$/.test(code)) {
+        alert("Chuỗi mã phải gồm đúng 11 ký tự và chỉ chứa 0 hoặc 1!");
+        return;
+    }
+
+    let pos = Math.floor(Math.random() * 11);
+    let bits = code.split("");
+    bits[pos] = bits[pos] === "0" ? "1" : "0";
+    codeField.value = bits.join("");
+
+    alert(`💥 Đã tạo lỗi ngẫu nhiên tại vị trí bit thứ ${11 - pos}!`);
+}
+</script>
+
+</body>
+</html>
